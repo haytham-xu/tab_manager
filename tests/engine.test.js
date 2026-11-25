@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { TabEngine } from '../src/core/engine'
-import { initialState } from '../src/core/model'
+import { SETTINGS, initialState } from '../src/core/model'
 
 const url = 'https://test.invalid/Path?a=1#A'
 function fixture() {
@@ -40,6 +40,50 @@ describe('browser-independent engine', () => {
     const restarted = new TabEngine(app)
     await restarted.ready
     expect(restarted.state.settings.reuseEnabled).toBe(false)
+  })
+
+  it('persists layout changes across restart while preserving the browser topics', async () => {
+    const before = (await engine.request('backup')).groups
+    const groupId = engine.state.groups[0].id
+    await engine.request('settings', { sandboxWidth: 520, topicWidth: 280, topicVisibleTabs: 1, reuseEnabled: false })
+    const restarted = new TabEngine(app)
+    await restarted.ready
+    expect(restarted.state.settings).toMatchObject({ layoutMode: 'manual', sandboxWidth: 520, topicWidth: 280, topicVisibleTabs: 1, reuseEnabled: false })
+    expect(restarted.state.groups[0].id).toBe(groupId)
+    expect((await restarted.request('backup')).groups).toEqual(before)
+  })
+
+  it('loads layout defaults for older local state without resetting an explicit reuse choice', async () => {
+    for (const key of ['sandboxWidth', 'topicWidth', 'topicVisibleTabs']) delete app.stored.settings[key]
+    app.stored.settings.reuseEnabled = false
+    const restarted = new TabEngine(app)
+    await restarted.ready
+    expect(restarted.state.settings).toMatchObject({ sandboxWidth: SETTINGS.sandboxWidth, topicWidth: SETTINGS.topicWidth, topicVisibleTabs: SETTINGS.topicVisibleTabs, reuseEnabled: false })
+    expect(restarted.state.groups[0].tabs[0].url).toBe(url)
+  })
+
+  it('preserves manual sizes when automatic layout is enabled and after restart', async () => {
+    await engine.request('settings', { sandboxWidth: 520, topicWidth: 340, topicVisibleTabs: 4 })
+    await engine.request('settings', { layoutMode: 'auto' })
+    const restarted = new TabEngine(app)
+    await restarted.ready
+    expect(restarted.state.settings).toMatchObject({ layoutMode: 'auto', sandboxWidth: 520, topicWidth: 340, topicVisibleTabs: 4 })
+    await restarted.request('settings', { layoutMode: 'manual' })
+    expect(restarted.state.settings).toMatchObject({ layoutMode: 'manual', sandboxWidth: 520, topicWidth: 340, topicVisibleTabs: 4 })
+  })
+
+  it('saves visible tabs without switching width modes or replacing the widths', async () => {
+    const widths = { sandboxWidth: engine.state.settings.sandboxWidth, topicWidth: engine.state.settings.topicWidth }
+    await engine.request('settings', { topicVisibleTabs: 8 })
+    expect(engine.state.settings).toMatchObject({ ...widths, layoutMode: 'auto', topicVisibleTabs: 8 })
+    const restarted = new TabEngine(app)
+    await restarted.ready
+    expect(restarted.state.settings).toMatchObject({ ...widths, layoutMode: 'auto', topicVisibleTabs: 8 })
+    await restarted.request('settings', { layoutMode: 'manual' })
+    await restarted.request('settings', { topicVisibleTabs: 3 })
+    expect(restarted.state.settings).toMatchObject({ ...widths, layoutMode: 'manual', topicVisibleTabs: 3 })
+    await restarted.request('settings', { layoutMode: 'auto' })
+    expect(restarted.state.settings).toMatchObject({ ...widths, layoutMode: 'auto', topicVisibleTabs: 3 })
   })
 
   it('tracks new tabs as Sandbox entries and assigns them locally', async () => {

@@ -12,6 +12,16 @@ Your data stays local.
 local port, account or cloud service is required.
 
 
+## Screenshots
+
+**Sandbox open**
+
+![Tab Manager with Sandbox open and two columns of topics](docs/screenshots/sandbox-on.png)
+
+**Sandbox hidden**
+
+![Tab Manager with Sandbox hidden and three columns of topics](docs/screenshots/sandbox-off.png)
+
 ## Install
 
 The ready-to-load extension is in `dist/`.
@@ -31,7 +41,7 @@ load the project root: the compiled service worker and pages live in `dist`.
 	hover displays its full name. Renames and window switches update automatically.
 	Unnamed and incognito windows clear the badge. Badge updates never activate tabs
 	or focus browser windows.
-- Fixed 700px Sandbox with selection, current-topic assignment, target assignment,
+- Adjustable Sandbox with selection, current-topic assignment, target assignment,
 	live/archive targets, focus and immediate close. Hide it without a placeholder.
 - Drag tabs between live windows and archives; drag topic headers to reorder.
 - Native tab ordering, individual names, favicon, details and exact duplicate colors.
@@ -80,6 +90,36 @@ actions share the main header. Archived topics use neutral gray backgrounds and
 grayscale favicons. Restored tabs have explicit per-tab reuse exemptions, and each
 new-tab reuse decision is consumed only once. A restore creates its window in the
 background and focuses the selected target once after creation is complete.
+
+Settings include automatic and manual layouts, Sandbox width, minimum topic card width
+and an independent visible tab limit. Automatic mode follows the current manager window's viewport
+and available space, updating when you resize the window, change browser zoom or move
+between displays. Each manager window adapts independently; saved manual sizes are preserved.
+Cards expand to fill their row; longer topics scroll within the configured tab limit.
+Sandbox tabs and the bulk toolbar stay on a single line; its minimum width is 470px.
+Narrow windows scroll the workspace horizontally rather than wrapping its controls.
+The default 480px Sandbox and 320px minimum topic width display two topic columns
+with Sandbox open and three with it closed at a 1280px viewport. Set minimum topic
+width to 280px for four columns with Sandbox closed. Layout preferences stay local.
+
+Automatic mode chooses the closest reference width for Sandbox and topic cards. Its
+width fields are gray and disabled. Visible tabs per topic stays editable in both modes;
+changing it leaves widths and layout mode unchanged. Switching modes, selecting a preset
+or resetting widths preserves the tab limit. Sizes are browser CSS pixels, so Retina
+scaling and the monitor's advertised
+physical resolution do not need separate device rules. Intermediate widths such as
+2440 use the nearby 2560 preset. Existing custom widths remain in Manual mode until you
+choose Automatic; manual mode can also start from any preset.
+
+| Reference viewport width | Sandbox width | Minimum topic width | Columns with Sandbox | Columns without Sandbox |
+| --- | --- | --- | --- | --- |
+| 1280 | 480 | 320 | 2 | 3 |
+| 1440 | 500 | 330 | 2 | 4 |
+| 1920 | 560 | 360 | 3 | 5 |
+| 2560 | 640 | 380 | 4 | 6 |
+| 3440 | 760 | 400 | 6 | 8 |
+
+Column counts assume enough topics; fewer topics expand to fill the row.
 
 ```sh
 npm install

@@ -1,4 +1,4 @@
-import { SETTINGS, exactMatches, freshTab, groupName, initialState, makeBackup, normalizeGroup, signature, urlOverlap, validateBackup } from './model'
+import { LAYOUT_WIDTH_OPTIONS, SETTINGS, exactMatches, freshTab, groupName, initialState, makeBackup, normalizeGroup, normalizeSettings, signature, urlOverlap, validateBackup } from './model'
 
 export class TabEngine {
   constructor({ browser, database, onChange = () => {} }) {
@@ -13,7 +13,7 @@ export class TabEngine {
   async initialize() {
     this.state = await this.database.load() || initialState()
     this.state.groups = this.state.groups.map(normalizeGroup)
-    this.state.settings = { ...structuredClone(SETTINGS), ...this.state.settings }
+    this.state.settings = normalizeSettings(this.state.settings)
     this.state.suppressed ||= {}
     this.state.closingWindows ||= {}
     this.state.candidates ||= {}
@@ -397,6 +397,8 @@ export class TabEngine {
         case 'reorderTabs': await this.reorderTabs(payload.groupId, payload.ids); break
         case 'settings': {
           for (const [key, value] of Object.entries(payload)) if (Object.hasOwn(SETTINGS, key)) this.state.settings[key] = value
+          if (!Object.hasOwn(payload, 'layoutMode') && Object.keys(LAYOUT_WIDTH_OPTIONS).some(key => Object.hasOwn(payload, key))) this.state.settings.layoutMode = 'manual'
+          this.state.settings = normalizeSettings(this.state.settings)
           if (!this.state.settings.reuseEnabled || this.state.settings.pausedUntil > Date.now()) this.state.candidates = {}
           await this.save()
           break

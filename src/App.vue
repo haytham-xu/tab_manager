@@ -1,8 +1,9 @@
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, provide, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, provide, reactive, ref, watch } from 'vue'
 import { Archive, ArrowDownToLine, ChevronDown, ChevronRight, CloudOff, Download, FolderOpen, LayoutPanelLeft, LoaderCircle, MoreHorizontal, Pin, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, Upload, X } from '@lucide/vue'
 import { isExtension, request, subscribe } from './client'
-import { SETTINGS, duplicateColors, groupName, tabName } from './core/model'
+import { LAYOUT_OPTIONS, LAYOUT_WIDTH_OPTIONS, SETTINGS, duplicateColors, groupName, normalizeSettings, tabName } from './core/model'
+import { LAYOUT_METRICS, LAYOUT_PRESETS, closestLayoutPreset, resolveLayout } from './core/layout'
 import IconButton from './components/IconButton.vue'
 import Modal from './components/Modal.vue'
 import TabRow from './components/TabRow.vue'
@@ -23,6 +24,10 @@ const info = ref(null)
 const edit = ref(null)
 const confirmation = ref(null)
 const settingsOpen = ref(false)
+const layoutDraft = reactive({})
+const selectedLayoutPreset = ref('')
+const workspace = ref(null)
+const workspaceSpace = reactive({ width: 0, viewportWidth: window.innerWidth, viewportHeight: window.innerHeight, ...LAYOUT_METRICS })
 const batchId = ref(null)
 const batchSelected = ref([])
 const batchQuery = ref('')
@@ -33,11 +38,25 @@ const backupInput = ref(null)
 let unsubscribe = () => {}
 let noticeTimer
 let refreshing = false
+let workspaceObserver
+let layoutFrame = 0
+
+const layoutSettings = computed(() => normalizeSettings(state.value.settings))
 
 const sandbox = computed(() => state.value.groups.filter(group => group.status === 'live').flatMap(group => group.tabs.filter(tab => !tab.assigned).map(tab => ({ ...tab, groupId: group.id }))))
 const colors = computed(() => duplicateColors(state.value.groups))
 const currentGroups = computed(() => state.value.groups.filter(group => group.hibernate === (view.value === 'hibernate')))
 const visibleGroups = computed(() => currentGroups.value.filter(group => !query.value || `${groupName(group)} ${group.tabs.map(tab => `${tabName(tab)} ${tab.url}`).join(' ')}`.toLowerCase().includes(query.value.toLowerCase())))
+const layoutArea = computed(() => ({ ...workspaceSpace, groupCount: visibleGroups.value.length }))
+const currentLayout = computed(() => resolveLayout(layoutSettings.value, layoutArea.value))
+const automaticLayout = computed(() => resolveLayout({ ...layoutSettings.value, layoutMode: 'auto' }, layoutArea.value))
+const suggestedPreset = computed(() => closestLayoutPreset(workspaceSpace.viewportWidth))
+const layoutStyle = computed(() => ({
+  '--sandbox-width': currentLayout.value.sandboxWidth + 'px',
+  '--sandbox-min-width': LAYOUT_OPTIONS.sandboxWidth.min + 'px',
+  '--topic-width': currentLayout.value.topicWidth + 'px',
+  '--topic-visible-tabs': currentLayout.value.topicVisibleTabs,
+}))
 const allTabs = computed(() => state.value.groups.reduce((sum, group) => sum + group.tabs.length, 0))
 const batchGroup = computed(() => state.value.groups.find(group => group.id === batchId.value))
 const batchTabs = computed(() => (batchGroup.value?.tabs || []).filter(tab => (!batchQuery.value || `${tabName(tab)} ${tab.url}`.toLowerCase().includes(batchQuery.value.toLowerCase())) && (!duplicateOnly.value || (batchGroup.value.tabs.filter(item => item.url === tab.url).length > 1))))
@@ -190,7 +209,30 @@ function drop(event, group, targetTab) {
   }
 }
 
-function openSettings() { settingsOpen.value = true }
+function openSettings() {
+  for (const key of Object.keys(LAYOUT_OPTIONS)) layoutDraft[key] = layoutSettings.value[key]
+  layoutDraft.layoutMode = layoutSettings.value.layoutMode
+  selectedLayoutPreset.value = ''
+  settingsOpen.value = true
+}
+function resetLayoutDraft() {
+  for (const key of Object.keys(LAYOUT_WIDTH_OPTIONS)) layoutDraft[key] = SETTINGS[key]
+  layoutDraft.layoutMode = SETTINGS.layoutMode
+  selectedLayoutPreset.value = ''
+}
+function chooseLayoutPreset() {
+  const preset = LAYOUT_PRESETS.find(item => item.id === selectedLayoutPreset.value)
+  if (preset) for (const key of Object.keys(LAYOUT_WIDTH_OPTIONS)) layoutDraft[key] = preset[key]
+}
+function editLayoutNumber(key, event) {
+  layoutDraft[key] = event.target.value === '' ? '' : event.target.valueAsNumber
+}
+async function saveLayout() {
+  if (await run('settings', { ...layoutDraft }, 'Layout saved')) {
+    for (const key of Object.keys(LAYOUT_OPTIONS)) layoutDraft[key] = layoutSettings.value[key]
+    layoutDraft.layoutMode = layoutSettings.value.layoutMode
+  }
+}
 async function exportBackup() {
   try {
     const backup = await request('backup')
@@ -219,12 +261,37 @@ function archiveAll() {
   })
 }
 
+function measureLayout() {
+  layoutFrame = 0
+  if (!workspace.value) return
+  const element = workspace.value
+  const style = getComputedStyle(element)
+  workspaceSpace.viewportWidth = window.innerWidth
+  workspaceSpace.viewportHeight = window.innerHeight
+  workspaceSpace.width = element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+  workspaceSpace.workspaceGap = parseFloat(style.columnGap) || 0
+  workspaceSpace.topicGap = parseFloat(getComputedStyle(element.querySelector('.topics')).columnGap) || 0
+}
+function queueLayoutMeasure() {
+  if (!layoutFrame) layoutFrame = requestAnimationFrame(measureLayout)
+}
+watch([error, () => state.value.settings.sandboxVisible, () => sandbox.value.length, () => visibleGroups.value.length], queueLayoutMeasure, { flush: 'post' })
+
 onMounted(async () => {
+  workspaceObserver = new ResizeObserver(queueLayoutMeasure)
+  workspaceObserver.observe(workspace.value)
+  window.addEventListener('resize', queueLayoutMeasure)
+  window.visualViewport?.addEventListener('resize', queueLayoutMeasure)
+  queueLayoutMeasure()
   document.addEventListener('click', dismissOutsideActionMenus, true)
   await refresh()
   unsubscribe = subscribe(refresh)
 })
 onUnmounted(() => {
+  workspaceObserver?.disconnect()
+  window.removeEventListener('resize', queueLayoutMeasure)
+  window.visualViewport?.removeEventListener('resize', queueLayoutMeasure)
+  cancelAnimationFrame(layoutFrame)
   document.removeEventListener('click', dismissOutsideActionMenus, true)
   unsubscribe()
   clearTimeout(noticeTimer)
@@ -253,7 +320,7 @@ onUnmounted(() => {
     </header>
 
     <div v-if="error" class="error-banner" role="alert"><span>{{ error }}</span><button aria-label="Dismiss error" @click="error = ''"><X :size="16" /></button></div>
-    <div class="workspace" :class="{ 'sandbox-hidden': !state.settings.sandboxVisible }">
+    <div ref="workspace" class="workspace" :style="layoutStyle" :data-layout-mode="currentLayout.mode" :data-layout-preset="currentLayout.preset?.id || 'manual'" :data-window-width="workspaceSpace.viewportWidth" :data-window-height="workspaceSpace.viewportHeight" :class="{ 'sandbox-hidden': !state.settings.sandboxVisible, 'is-stacked': currentLayout.stacked }">
       <aside v-if="state.settings.sandboxVisible" class="sandbox-panel" aria-label="Sandbox">
         <header class="sandbox-header"><h2>Sandbox <span class="count">{{ sandbox.length }}</span></h2><label><input type="checkbox" :checked="sandbox.length > 0 && selected.length === sandbox.length" :indeterminate="selected.length > 0 && selected.length < sandbox.length" @change="selected = $event.target.checked ? sandbox.map(tab => tab.id) : []" />Select all</label><IconButton label="Hide Sandbox" :icon="LayoutPanelLeft" @click="run('settings', { sandboxVisible: false })" /></header>
         <div class="sandbox-toolbar"><select v-model="bulkTarget" aria-label="Bulk target topic"><option value="">Move selected to…</option><option v-for="group in state.groups" :key="group.id" :value="group.id">{{ groupName(group) }}{{ group.status === 'archived' ? ' · Archived' : '' }}</option></select><button class="primary" :disabled="!selected.length || !bulkTarget || busy" @click="run('transfer', { tabIds: selected, groupId: bulkTarget }, 'Tabs assigned')">Move</button><button class="secondary" :disabled="!selected.length || busy" @click="run('assign', { tabIds: selected }, 'Tabs assigned')">Assign current group</button></div>
@@ -290,7 +357,28 @@ onUnmounted(() => {
 
     <Modal v-if="confirmation" :title="confirmation.title" @close="confirmation = null"><p class="confirm-body">{{ confirmation.body }}</p><div class="modal-actions"><button class="secondary" :disabled="busy" @click="confirmation = null">Cancel</button><button class="danger-button" :disabled="busy" @click="confirm">Confirm</button></div></Modal>
 
-    <Modal v-if="settingsOpen" title="Settings" @close="settingsOpen = false"><section class="settings-section"><h3>Local backup</h3><div class="settings-quick"><button type="button" class="secondary" @click="exportBackup"><Download :size="15" />Export</button><button type="button" class="secondary" @click="backupInput.click()"><Upload :size="15" />Import</button></div><p class="privacy-note">Backup files contain your tab URLs. Keep them private.</p></section><section class="settings-section"><div class="settings-quick"><button type="button" class="secondary" :disabled="!state.settings.reuseEnabled" @click="run('settings', { pausedUntil: state.settings.pausedUntil > Date.now() ? 0 : Date.now() + 600000 })">{{ state.settings.pausedUntil > Date.now() ? 'Resume reuse' : 'Pause for 10 minutes' }}</button><button type="button" class="secondary" :disabled="!state.settings.reuseEnabled" @click="run('settings', { skipNext: !state.settings.skipNext })">{{ state.settings.skipNext ? 'Cancel bypass' : 'Allow next tab' }}</button></div></section><div class="modal-actions"><button type="button" class="primary" @click="settingsOpen = false">Done</button></div></Modal>
+    <Modal v-if="settingsOpen" title="Settings" @close="settingsOpen = false">
+      <section class="settings-section">
+        <h3>Layout</h3>
+        <p class="layout-note">Automatic adjusts widths to this window. The visible tab limit applies in both modes.</p>
+        <p class="layout-status">Window: {{ workspaceSpace.viewportWidth }} × {{ workspaceSpace.viewportHeight }} · Suggested preset: {{ suggestedPreset.label }} ({{ suggestedPreset.viewportWidth }})</p>
+        <form class="layout-options" @submit.prevent="saveLayout">
+          <label class="layout-field"><span>Layout mode</span><select v-model="layoutDraft.layoutMode" aria-label="Layout mode"><option value="auto">Automatic</option><option value="manual">Manual</option></select></label>
+          <label v-if="layoutDraft.layoutMode === 'manual'" class="layout-field"><span>Start from preset</span><select v-model="selectedLayoutPreset" aria-label="Start from preset" @change="chooseLayoutPreset"><option value="">Choose preset…</option><option v-for="preset in LAYOUT_PRESETS" :key="preset.id" :value="preset.id">{{ preset.viewportWidth }} · {{ preset.label }}</option></select></label>
+          <label v-for="(option, key) in LAYOUT_WIDTH_OPTIONS" :key="key" class="layout-field">
+            <span>{{ option.label }}</span>
+            <span class="layout-value"><input :value="layoutDraft.layoutMode === 'auto' ? automaticLayout[key] : layoutDraft[key]" :disabled="layoutDraft.layoutMode === 'auto'" type="number" :min="option.min" :max="option.max" :step="option.step" :aria-label="option.label" required @input="editLayoutNumber(key, $event)" /><span>{{ option.unit }}</span></span>
+          </label>
+          <label class="layout-field">
+            <span>{{ LAYOUT_OPTIONS.topicVisibleTabs.label }}</span>
+            <span class="layout-value"><input v-model.number="layoutDraft.topicVisibleTabs" type="number" :min="LAYOUT_OPTIONS.topicVisibleTabs.min" :max="LAYOUT_OPTIONS.topicVisibleTabs.max" :step="LAYOUT_OPTIONS.topicVisibleTabs.step" :aria-label="LAYOUT_OPTIONS.topicVisibleTabs.label" required /><span>{{ LAYOUT_OPTIONS.topicVisibleTabs.unit }}</span></span>
+          </label>
+          <div class="settings-quick"><button type="submit" class="primary" :disabled="busy">Apply layout</button><button type="button" class="secondary" :disabled="busy" @click="resetLayoutDraft">Use default widths</button></div>
+        </form>
+      </section>
+      <section class="settings-section"><h3>Local backup</h3><div class="settings-quick"><button type="button" class="secondary" @click="exportBackup"><Download :size="15" />Export</button><button type="button" class="secondary" @click="backupInput.click()"><Upload :size="15" />Import</button></div><p class="privacy-note">Backup files contain your tab URLs. Keep them private.</p></section>
+      <section class="settings-section"><div class="settings-quick"><button type="button" class="secondary" :disabled="!state.settings.reuseEnabled" @click="run('settings', { pausedUntil: state.settings.pausedUntil > Date.now() ? 0 : Date.now() + 600000 })">{{ state.settings.pausedUntil > Date.now() ? 'Resume reuse' : 'Pause for 10 minutes' }}</button><button type="button" class="secondary" :disabled="!state.settings.reuseEnabled" @click="run('settings', { skipNext: !state.settings.skipNext })">{{ state.settings.skipNext ? 'Cancel bypass' : 'Allow next tab' }}</button></div></section>
+    </Modal>
 
     <Modal v-if="batchGroup" :title="`Batch · ${groupName(batchGroup)}`" wide @close="batchId = null"><div class="batch-toolbar"><label class="search-field"><Search :size="16" /><input v-model="batchQuery" placeholder="Filter tabs" aria-label="Filter batch tabs" /></label><label class="setting-toggle"><input v-model="duplicateOnly" type="checkbox" />Duplicates only</label><button class="secondary" :disabled="!batchDuplicates || busy" @click="dedupeBatch">Remove {{ batchDuplicates }} duplicates</button><IconButton label="Sort by website" :icon="SlidersHorizontal" :disabled="busy" @click="sortBatch" /></div><div class="batch-actions"><label><input type="checkbox" :checked="batchTabs.length > 0 && batchTabs.every(tab => batchSelected.includes(tab.id))" @change="batchSelected = $event.target.checked ? batchTabs.map(tab => tab.id) : []" />Select all</label><span>{{ batchSelected.length }} selected</span><select v-model="batchTarget" aria-label="Batch target topic"><option value="">Move selected to…</option><option v-for="target in state.groups.filter(item => item.id !== batchId)" :key="target.id" :value="target.id">{{ groupName(target) }}{{ target.status === 'archived' ? ' · Archived' : '' }}</option></select><button class="primary" :disabled="!batchTarget || !batchSelected.length || busy" @click="batchMove">Move</button><IconButton label="Remove selected tabs" :icon="Trash2" :disabled="!batchSelected.length || busy" @click="batchClose" /></div><div class="batch-list"><div v-for="tab in batchTabs" :key="tab.id" class="batch-row" :class="colors.has(tab.url) ? `duplicate-${colors.get(tab.url)}` : ''"><input type="checkbox" :checked="batchSelected.includes(tab.id)" :aria-label="`Select ${tabName(tab)}`" @change="selectTab(tab.id, $event.target.checked, true)" /><span class="batch-title" :title="tabName(tab)">{{ tabName(tab) }}</span><span class="batch-url" :title="tab.url">{{ tab.url }}</span><IconButton label="Tab details" :icon="Settings" @click="info = { tab, group: batchGroup }" /></div><div v-if="!batchTabs.length" class="empty-inline">No matching tabs</div></div></Modal>
   </main>

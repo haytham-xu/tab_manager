@@ -2,9 +2,37 @@ import 'fake-indexeddb/auto'
 import { describe, expect, it } from 'vitest'
 import { createDatabase } from '../src/core/database'
 import { chromeBrowser } from '../src/core/chrome-browser'
-import { duplicateColors, exactMatches, initialState, makeBackup, normalizeGroup, validateBackup } from '../src/core/model'
+import { LAYOUT_OPTIONS, SETTINGS, duplicateColors, exactMatches, initialState, makeBackup, normalizeGroup, normalizeSettings, validateBackup } from '../src/core/model'
 
 describe('local tab state', () => {
+  it('enables automatic layout for defaults while preserving older custom sizes as manual', () => {
+    expect(normalizeSettings({ sandboxWidth: SETTINGS.sandboxWidth, topicWidth: SETTINGS.topicWidth, topicVisibleTabs: SETTINGS.topicVisibleTabs }).layoutMode).toBe('auto')
+    expect(normalizeSettings({ sandboxWidth: 520, topicWidth: 340, topicVisibleTabs: 4 }).layoutMode).toBe('manual')
+    expect(normalizeSettings({ layoutMode: 'manual' }).layoutMode).toBe('manual')
+    expect(normalizeSettings({ layoutMode: 'unknown' }).layoutMode).toBe('auto')
+  })
+
+  it('does not infer manual widths from a legacy visible-tab customization', () => {
+    expect(normalizeSettings({ topicVisibleTabs: 8 })).toMatchObject({ layoutMode: 'auto', topicVisibleTabs: 8 })
+    expect(normalizeSettings({ sandboxWidth: SETTINGS.sandboxWidth, topicWidth: SETTINGS.topicWidth, topicVisibleTabs: 3 })).toMatchObject({ layoutMode: 'auto', topicVisibleTabs: 3 })
+  })
+
+  it('adds layout defaults to legacy settings without changing saved choices', () => {
+    const saved = { sandboxVisible: false, reuseEnabled: false, collapsedGroups: ['topic'] }
+    const settings = normalizeSettings(saved)
+    expect(settings).toMatchObject({ ...saved, sandboxWidth: SETTINGS.sandboxWidth, topicWidth: SETTINGS.topicWidth, topicVisibleTabs: SETTINGS.topicVisibleTabs })
+    expect(saved).not.toHaveProperty('sandboxWidth')
+  })
+
+  it('keeps layout dimensions usable when stored values are malformed or out of bounds', () => {
+    expect(normalizeSettings({ sandboxWidth: -20, topicWidth: 100000, topicVisibleTabs: 3.6 })).toMatchObject({
+      sandboxWidth: LAYOUT_OPTIONS.sandboxWidth.min, topicWidth: LAYOUT_OPTIONS.topicWidth.max, topicVisibleTabs: 4,
+    })
+    expect(normalizeSettings({ sandboxWidth: NaN, topicWidth: 'wide', topicVisibleTabs: null })).toMatchObject({
+      sandboxWidth: SETTINGS.sandboxWidth, topicWidth: SETTINGS.topicWidth, topicVisibleTabs: SETTINGS.topicVisibleTabs,
+    })
+  })
+
   it('uses complete URL equality for duplicates and archived lookup', () => {
     const url = 'https://test.invalid/Path?a=1&b=2#A'
     const groups = [{ id: 'topic', name: 'Topic', tabs: [{ id: 'tab', url }, { id: 'same', url }] }]
