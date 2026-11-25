@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { TabEngine } from '../src/core/engine'
-import { initialState } from '../src/core/model'
+import { SETTINGS, initialState } from '../src/core/model'
 
 const url = 'https://test.invalid/Path?a=1#A'
 function fixture() {
@@ -40,6 +40,26 @@ describe('browser-independent engine', () => {
     const restarted = new TabEngine(app)
     await restarted.ready
     expect(restarted.state.settings.reuseEnabled).toBe(false)
+  })
+
+  it('persists layout changes across restart while preserving the browser topics', async () => {
+    const before = (await engine.request('backup')).groups
+    const groupId = engine.state.groups[0].id
+    await engine.request('settings', { sandboxWidth: 520, topicWidth: 280, topicVisibleTabs: 1, reuseEnabled: false })
+    const restarted = new TabEngine(app)
+    await restarted.ready
+    expect(restarted.state.settings).toMatchObject({ sandboxWidth: 520, topicWidth: 280, topicVisibleTabs: 1, reuseEnabled: false })
+    expect(restarted.state.groups[0].id).toBe(groupId)
+    expect((await restarted.request('backup')).groups).toEqual(before)
+  })
+
+  it('loads layout defaults for older local state without resetting an explicit reuse choice', async () => {
+    for (const key of ['sandboxWidth', 'topicWidth', 'topicVisibleTabs']) delete app.stored.settings[key]
+    app.stored.settings.reuseEnabled = false
+    const restarted = new TabEngine(app)
+    await restarted.ready
+    expect(restarted.state.settings).toMatchObject({ sandboxWidth: SETTINGS.sandboxWidth, topicWidth: SETTINGS.topicWidth, topicVisibleTabs: SETTINGS.topicVisibleTabs, reuseEnabled: false })
+    expect(restarted.state.groups[0].tabs[0].url).toBe(url)
   })
 
   it('tracks new tabs as Sandbox entries and assigns them locally', async () => {

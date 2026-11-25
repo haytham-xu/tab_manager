@@ -1,11 +1,29 @@
+export const LAYOUT_OPTIONS = {
+  sandboxWidth: { label: 'Sandbox width', min: 470, max: 900, step: 10, default: 480, unit: 'px' },
+  topicWidth: { label: 'Minimum topic width', min: 280, max: 720, step: 10, default: 320, unit: 'px' },
+  topicVisibleTabs: { label: 'Visible tabs per topic', min: 1, max: 20, step: 1, default: 5, unit: 'tabs' },
+}
+
 export const SETTINGS = {
   sandboxVisible: true,
+  sandboxWidth: LAYOUT_OPTIONS.sandboxWidth.default,
+  topicWidth: LAYOUT_OPTIONS.topicWidth.default,
+  topicVisibleTabs: LAYOUT_OPTIONS.topicVisibleTabs.default,
   followActive: true,
   reuseEnabled: true,
   pausedUntil: 0,
   skipNext: false,
   excludedHosts: [],
   collapsedGroups: [],
+}
+
+export function normalizeSettings(saved) {
+  const settings = { ...structuredClone(SETTINGS), ...saved }
+  for (const [key, option] of Object.entries(LAYOUT_OPTIONS)) {
+    const value = Number.isFinite(settings[key]) ? settings[key] : option.default
+    settings[key] = Math.max(option.min, Math.min(option.max, Math.round(value / option.step) * option.step))
+  }
+  return settings
 }
 
 export function initialState() {

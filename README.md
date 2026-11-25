@@ -12,6 +12,16 @@ Your data stays local.
 local port, account or cloud service is required.
 
 
+## Screenshots
+
+**Sandbox open**
+
+![Tab Manager with Sandbox open and two columns of topics](docs/screenshots/sandbox-on.png)
+
+**Sandbox hidden**
+
+![Tab Manager with Sandbox hidden and three columns of topics](docs/screenshots/sandbox-off.png)
+
 ## Install
 
 The ready-to-load extension is in `dist/`.
@@ -31,7 +41,7 @@ load the project root: the compiled service worker and pages live in `dist`.
 	hover displays its full name. Renames and window switches update automatically.
 	Unnamed and incognito windows clear the badge. Badge updates never activate tabs
 	or focus browser windows.
-- Fixed 700px Sandbox with selection, current-topic assignment, target assignment,
+- Adjustable Sandbox with selection, current-topic assignment, target assignment,
 	live/archive targets, focus and immediate close. Hide it without a placeholder.
 - Drag tabs between live windows and archives; drag topic headers to reorder.
 - Native tab ordering, individual names, favicon, details and exact duplicate colors.
@@ -80,6 +90,14 @@ actions share the main header. Archived topics use neutral gray backgrounds and
 grayscale favicons. Restored tabs have explicit per-tab reuse exemptions, and each
 new-tab reuse decision is consumed only once. A restore creates its window in the
 background and focuses the selected target once after creation is complete.
+
+Settings include Sandbox width, minimum topic card width and visible tabs per topic.
+Cards expand to fill their row; longer topics scroll within the configured tab limit.
+Sandbox tabs and the bulk toolbar stay on a single line; its minimum width is 470px.
+Narrow windows scroll the workspace horizontally rather than wrapping its controls.
+The default 480px Sandbox and 320px minimum topic width display two topic columns
+with Sandbox open and three with it closed at a 1280px viewport. Set minimum topic
+width to 280px for four columns with Sandbox closed. Layout preferences stay local.
 
 ```sh
 npm install
