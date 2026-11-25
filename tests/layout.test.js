@@ -18,13 +18,22 @@ describe('automatic window layouts', () => {
     expect(resolveLayout({ layoutMode: 'auto', sandboxVisible: false }, area(width)).columns).toBe(offColumns)
   })
 
-  it('adjusts visible rows for the current height while retaining a usable minimum', () => {
-    const short = resolveLayout({ layoutMode: 'auto' }, area(1280, 800, 5))
-    const tall = resolveLayout({ layoutMode: 'auto' }, area(1280, 1080, 5))
-    expect(short.topicVisibleTabs).toBe(3)
-    expect(tall.topicVisibleTabs).toBe(5)
-    expect(resolveLayout({ layoutMode: 'auto' }, { ...area(1280), height: 0 }).topicVisibleTabs).toBe(1)
-    expect(tall.topicVisibleTabs).toBeLessThanOrEqual(tall.preset.topicVisibleTabs)
+  it('keeps the visible tab limit independent of viewport, height and layout mode', () => {
+    for (const mode of ['auto', 'manual']) for (const width of [1280, 2440, 3440]) for (const height of [520, 1440]) {
+      expect(resolveLayout({ layoutMode: mode, topicVisibleTabs: 8 }, area(width, height, 5)).topicVisibleTabs).toBe(8)
+    }
+  })
+
+  it('changing visible tabs cannot change widths, columns or stacking', () => {
+    for (const mode of ['auto', 'manual']) {
+      const saved = { layoutMode: mode, sandboxWidth: 520, topicWidth: 340 }
+      const baseline = resolveLayout({ ...saved, topicVisibleTabs: 1 }, area(1920))
+      for (const count of [3, 8, 20]) {
+        expect(resolveLayout({ ...saved, topicVisibleTabs: count }, area(1920))).toMatchObject({
+          mode: baseline.mode, sandboxWidth: baseline.sandboxWidth, topicWidth: baseline.topicWidth, columns: baseline.columns, stacked: baseline.stacked, topicVisibleTabs: count,
+        })
+      }
+    }
   })
 
   it('does not invent empty columns when there are only a few topics', () => {

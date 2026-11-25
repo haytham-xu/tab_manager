@@ -1,6 +1,10 @@
-export const LAYOUT_OPTIONS = {
+export const LAYOUT_WIDTH_OPTIONS = {
   sandboxWidth: { label: 'Sandbox width', min: 470, max: 900, step: 10, default: 480, unit: 'px' },
   topicWidth: { label: 'Minimum topic width', min: 280, max: 720, step: 10, default: 320, unit: 'px' },
+}
+
+export const LAYOUT_OPTIONS = {
+  ...LAYOUT_WIDTH_OPTIONS,
   topicVisibleTabs: { label: 'Visible tabs per topic', min: 1, max: 20, step: 1, default: 5, unit: 'tabs' },
 }
 
@@ -25,7 +29,7 @@ export function normalizeSettings(saved) {
     settings[key] = Math.max(option.min, Math.min(option.max, Math.round(value / option.step) * option.step))
   }
   if (saved?.layoutMode === undefined) {
-    settings.layoutMode = Object.keys(LAYOUT_OPTIONS).some(key => Number.isFinite(saved?.[key]) && settings[key] !== SETTINGS[key]) ? 'manual' : 'auto'
+    settings.layoutMode = Object.keys(LAYOUT_WIDTH_OPTIONS).some(key => Number.isFinite(saved?.[key]) && settings[key] !== SETTINGS[key]) ? 'manual' : 'auto'
   } else if (!['auto', 'manual'].includes(settings.layoutMode)) settings.layoutMode = 'auto'
   return settings
 }

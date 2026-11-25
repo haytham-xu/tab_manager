@@ -155,6 +155,7 @@ a { color: var(--accent); }
 .layout-field > select { width: 180px; max-width: 55%; }
 .layout-value { display: flex; align-items: center; gap: 8px; flex: none; }
 .layout-value input { width: 85px; }
+.layout-value input:disabled { background: #eef1ef; border-color: #d9e1dd; color: #89978e; cursor: not-allowed; }
 .layout-value > span { min-width: 28px; color: var(--muted); font-size: 12px; }
 .layout-options .settings-quick { margin: 4px 0 0; }
 .settings-quick { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }

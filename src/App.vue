@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, provide, reactive, ref, watch } from 'vue'
 import { Archive, ArrowDownToLine, ChevronDown, ChevronRight, CloudOff, Download, FolderOpen, LayoutPanelLeft, LoaderCircle, MoreHorizontal, Pin, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, Upload, X } from '@lucide/vue'
 import { isExtension, request, subscribe } from './client'
-import { LAYOUT_OPTIONS, SETTINGS, duplicateColors, groupName, normalizeSettings, tabName } from './core/model'
+import { LAYOUT_OPTIONS, LAYOUT_WIDTH_OPTIONS, SETTINGS, duplicateColors, groupName, normalizeSettings, tabName } from './core/model'
 import { LAYOUT_METRICS, LAYOUT_PRESETS, closestLayoutPreset, resolveLayout } from './core/layout'
 import IconButton from './components/IconButton.vue'
 import Modal from './components/Modal.vue'
@@ -27,7 +27,7 @@ const settingsOpen = ref(false)
 const layoutDraft = reactive({})
 const selectedLayoutPreset = ref('')
 const workspace = ref(null)
-const workspaceSpace = reactive({ width: 0, height: 0, viewportWidth: window.innerWidth, viewportHeight: window.innerHeight, ...LAYOUT_METRICS, sandboxHeight: 0 })
+const workspaceSpace = reactive({ width: 0, viewportWidth: window.innerWidth, viewportHeight: window.innerHeight, ...LAYOUT_METRICS })
 const batchId = ref(null)
 const batchSelected = ref([])
 const batchQuery = ref('')
@@ -216,13 +216,13 @@ function openSettings() {
   settingsOpen.value = true
 }
 function resetLayoutDraft() {
-  for (const key of Object.keys(LAYOUT_OPTIONS)) layoutDraft[key] = SETTINGS[key]
+  for (const key of Object.keys(LAYOUT_WIDTH_OPTIONS)) layoutDraft[key] = SETTINGS[key]
   layoutDraft.layoutMode = SETTINGS.layoutMode
   selectedLayoutPreset.value = ''
 }
 function chooseLayoutPreset() {
   const preset = LAYOUT_PRESETS.find(item => item.id === selectedLayoutPreset.value)
-  if (preset) for (const key of Object.keys(LAYOUT_OPTIONS)) layoutDraft[key] = preset[key]
+  if (preset) for (const key of Object.keys(LAYOUT_WIDTH_OPTIONS)) layoutDraft[key] = preset[key]
 }
 function editLayoutNumber(key, event) {
   layoutDraft[key] = event.target.value === '' ? '' : event.target.valueAsNumber
@@ -266,18 +266,11 @@ function measureLayout() {
   if (!workspace.value) return
   const element = workspace.value
   const style = getComputedStyle(element)
-  const bounds = element.getBoundingClientRect()
-  const topic = element.querySelector('.topic')
-  const list = topic?.querySelector('.topic-tabs')
   workspaceSpace.viewportWidth = window.innerWidth
   workspaceSpace.viewportHeight = window.innerHeight
   workspaceSpace.width = element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
-  workspaceSpace.height = Math.max(0, window.innerHeight - bounds.top - window.scrollY - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom))
   workspaceSpace.workspaceGap = parseFloat(style.columnGap) || 0
   workspaceSpace.topicGap = parseFloat(getComputedStyle(element.querySelector('.topics')).columnGap) || 0
-  workspaceSpace.tabRowHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--tab-row-height')) || LAYOUT_METRICS.tabRowHeight
-  workspaceSpace.topicChromeHeight = topic ? topic.offsetHeight - (list?.offsetHeight || 0) : LAYOUT_METRICS.topicChromeHeight
-  workspaceSpace.sandboxHeight = element.querySelector('.sandbox-panel')?.offsetHeight || 0
 }
 function queueLayoutMeasure() {
   if (!layoutFrame) layoutFrame = requestAnimationFrame(measureLayout)
@@ -367,16 +360,20 @@ onUnmounted(() => {
     <Modal v-if="settingsOpen" title="Settings" @close="settingsOpen = false">
       <section class="settings-section">
         <h3>Layout</h3>
-        <p class="layout-note">Automatic adapts to this window as it changes. Manual keeps the sizes you choose.</p>
+        <p class="layout-note">Automatic adjusts widths to this window. The visible tab limit applies in both modes.</p>
         <p class="layout-status">Window: {{ workspaceSpace.viewportWidth }} × {{ workspaceSpace.viewportHeight }} · Suggested preset: {{ suggestedPreset.label }} ({{ suggestedPreset.viewportWidth }})</p>
         <form class="layout-options" @submit.prevent="saveLayout">
           <label class="layout-field"><span>Layout mode</span><select v-model="layoutDraft.layoutMode" aria-label="Layout mode"><option value="auto">Automatic</option><option value="manual">Manual</option></select></label>
           <label v-if="layoutDraft.layoutMode === 'manual'" class="layout-field"><span>Start from preset</span><select v-model="selectedLayoutPreset" aria-label="Start from preset" @change="chooseLayoutPreset"><option value="">Choose preset…</option><option v-for="preset in LAYOUT_PRESETS" :key="preset.id" :value="preset.id">{{ preset.viewportWidth }} · {{ preset.label }}</option></select></label>
-          <label v-for="(option, key) in LAYOUT_OPTIONS" :key="key" class="layout-field">
+          <label v-for="(option, key) in LAYOUT_WIDTH_OPTIONS" :key="key" class="layout-field">
             <span>{{ option.label }}</span>
             <span class="layout-value"><input :value="layoutDraft.layoutMode === 'auto' ? automaticLayout[key] : layoutDraft[key]" :disabled="layoutDraft.layoutMode === 'auto'" type="number" :min="option.min" :max="option.max" :step="option.step" :aria-label="option.label" required @input="editLayoutNumber(key, $event)" /><span>{{ option.unit }}</span></span>
           </label>
-          <div class="settings-quick"><button type="submit" class="primary" :disabled="busy">Apply layout</button><button type="button" class="secondary" :disabled="busy" @click="resetLayoutDraft">Use defaults</button></div>
+          <label class="layout-field">
+            <span>{{ LAYOUT_OPTIONS.topicVisibleTabs.label }}</span>
+            <span class="layout-value"><input v-model.number="layoutDraft.topicVisibleTabs" type="number" :min="LAYOUT_OPTIONS.topicVisibleTabs.min" :max="LAYOUT_OPTIONS.topicVisibleTabs.max" :step="LAYOUT_OPTIONS.topicVisibleTabs.step" :aria-label="LAYOUT_OPTIONS.topicVisibleTabs.label" required /><span>{{ LAYOUT_OPTIONS.topicVisibleTabs.unit }}</span></span>
+          </label>
+          <div class="settings-quick"><button type="submit" class="primary" :disabled="busy">Apply layout</button><button type="button" class="secondary" :disabled="busy" @click="resetLayoutDraft">Use default widths</button></div>
         </form>
       </section>
       <section class="settings-section"><h3>Local backup</h3><div class="settings-quick"><button type="button" class="secondary" @click="exportBackup"><Download :size="15" />Export</button><button type="button" class="secondary" @click="backupInput.click()"><Upload :size="15" />Import</button></div><p class="privacy-note">Backup files contain your tab URLs. Keep them private.</p></section>

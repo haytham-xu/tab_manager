@@ -12,6 +12,11 @@ describe('local tab state', () => {
     expect(normalizeSettings({ layoutMode: 'unknown' }).layoutMode).toBe('auto')
   })
 
+  it('does not infer manual widths from a legacy visible-tab customization', () => {
+    expect(normalizeSettings({ topicVisibleTabs: 8 })).toMatchObject({ layoutMode: 'auto', topicVisibleTabs: 8 })
+    expect(normalizeSettings({ sandboxWidth: SETTINGS.sandboxWidth, topicWidth: SETTINGS.topicWidth, topicVisibleTabs: 3 })).toMatchObject({ layoutMode: 'auto', topicVisibleTabs: 3 })
+  })
+
   it('adds layout defaults to legacy settings without changing saved choices', () => {
     const saved = { sandboxVisible: false, reuseEnabled: false, collapsedGroups: ['topic'] }
     const settings = normalizeSettings(saved)

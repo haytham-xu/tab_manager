@@ -92,7 +92,7 @@ new-tab reuse decision is consumed only once. A restore creates its window in th
 background and focuses the selected target once after creation is complete.
 
 Settings include automatic and manual layouts, Sandbox width, minimum topic card width
-and visible tabs per topic. Automatic mode follows the current manager window's viewport
+and an independent visible tab limit. Automatic mode follows the current manager window's viewport
 and available space, updating when you resize the window, change browser zoom or move
 between displays. Each manager window adapts independently; saved manual sizes are preserved.
 Cards expand to fill their row; longer topics scroll within the configured tab limit.
@@ -102,10 +102,13 @@ The default 480px Sandbox and 320px minimum topic width display two topic column
 with Sandbox open and three with it closed at a 1280px viewport. Set minimum topic
 width to 280px for four columns with Sandbox closed. Layout preferences stay local.
 
-Automatic mode chooses the closest reference width and fits visible rows to the window
-height. Sizes are browser CSS pixels, so Retina scaling and the monitor's advertised
+Automatic mode chooses the closest reference width for Sandbox and topic cards. Its
+width fields are gray and disabled. Visible tabs per topic stays editable in both modes;
+changing it leaves widths and layout mode unchanged. Switching modes, selecting a preset
+or resetting widths preserves the tab limit. Sizes are browser CSS pixels, so Retina
+scaling and the monitor's advertised
 physical resolution do not need separate device rules. Intermediate widths such as
-2440 use the nearby 2560 preset. Existing custom sizes remain in Manual mode until you
+2440 use the nearby 2560 preset. Existing custom widths remain in Manual mode until you
 choose Automatic; manual mode can also start from any preset.
 
 | Reference viewport width | Sandbox width | Minimum topic width | Columns with Sandbox | Columns without Sandbox |

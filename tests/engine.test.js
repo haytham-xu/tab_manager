@@ -72,6 +72,20 @@ describe('browser-independent engine', () => {
     expect(restarted.state.settings).toMatchObject({ layoutMode: 'manual', sandboxWidth: 520, topicWidth: 340, topicVisibleTabs: 4 })
   })
 
+  it('saves visible tabs without switching width modes or replacing the widths', async () => {
+    const widths = { sandboxWidth: engine.state.settings.sandboxWidth, topicWidth: engine.state.settings.topicWidth }
+    await engine.request('settings', { topicVisibleTabs: 8 })
+    expect(engine.state.settings).toMatchObject({ ...widths, layoutMode: 'auto', topicVisibleTabs: 8 })
+    const restarted = new TabEngine(app)
+    await restarted.ready
+    expect(restarted.state.settings).toMatchObject({ ...widths, layoutMode: 'auto', topicVisibleTabs: 8 })
+    await restarted.request('settings', { layoutMode: 'manual' })
+    await restarted.request('settings', { topicVisibleTabs: 3 })
+    expect(restarted.state.settings).toMatchObject({ ...widths, layoutMode: 'manual', topicVisibleTabs: 3 })
+    await restarted.request('settings', { layoutMode: 'auto' })
+    expect(restarted.state.settings).toMatchObject({ ...widths, layoutMode: 'auto', topicVisibleTabs: 3 })
+  })
+
   it('tracks new tabs as Sandbox entries and assigns them locally', async () => {
     const tab = engine.state.groups[0].tabs[0]
     expect(tab.assigned).toBe(false)
