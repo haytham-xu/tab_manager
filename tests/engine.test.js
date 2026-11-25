@@ -48,7 +48,7 @@ describe('browser-independent engine', () => {
     await engine.request('settings', { sandboxWidth: 520, topicWidth: 280, topicVisibleTabs: 1, reuseEnabled: false })
     const restarted = new TabEngine(app)
     await restarted.ready
-    expect(restarted.state.settings).toMatchObject({ sandboxWidth: 520, topicWidth: 280, topicVisibleTabs: 1, reuseEnabled: false })
+    expect(restarted.state.settings).toMatchObject({ layoutMode: 'manual', sandboxWidth: 520, topicWidth: 280, topicVisibleTabs: 1, reuseEnabled: false })
     expect(restarted.state.groups[0].id).toBe(groupId)
     expect((await restarted.request('backup')).groups).toEqual(before)
   })
@@ -60,6 +60,16 @@ describe('browser-independent engine', () => {
     await restarted.ready
     expect(restarted.state.settings).toMatchObject({ sandboxWidth: SETTINGS.sandboxWidth, topicWidth: SETTINGS.topicWidth, topicVisibleTabs: SETTINGS.topicVisibleTabs, reuseEnabled: false })
     expect(restarted.state.groups[0].tabs[0].url).toBe(url)
+  })
+
+  it('preserves manual sizes when automatic layout is enabled and after restart', async () => {
+    await engine.request('settings', { sandboxWidth: 520, topicWidth: 340, topicVisibleTabs: 4 })
+    await engine.request('settings', { layoutMode: 'auto' })
+    const restarted = new TabEngine(app)
+    await restarted.ready
+    expect(restarted.state.settings).toMatchObject({ layoutMode: 'auto', sandboxWidth: 520, topicWidth: 340, topicVisibleTabs: 4 })
+    await restarted.request('settings', { layoutMode: 'manual' })
+    expect(restarted.state.settings).toMatchObject({ layoutMode: 'manual', sandboxWidth: 520, topicWidth: 340, topicVisibleTabs: 4 })
   })
 
   it('tracks new tabs as Sandbox entries and assigns them locally', async () => {

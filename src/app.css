@@ -149,8 +149,10 @@ a { color: var(--accent); }
 .settings-section { padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px solid var(--border); }
 .settings-section h3 { font-size: 13px; font-weight: 600; }
 .layout-note { margin: 8px 0 14px; color: var(--muted); font-size: 12px; }
+.layout-status { margin-bottom: 14px; color: var(--muted); font-size: 11px; }
 .layout-options { display: grid; gap: 10px; }
 .layout-field { justify-content: space-between; }
+.layout-field > select { width: 180px; max-width: 55%; }
 .layout-value { display: flex; align-items: center; gap: 8px; flex: none; }
 .layout-value input { width: 85px; }
 .layout-value > span { min-width: 28px; color: var(--muted); font-size: 12px; }

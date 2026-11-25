@@ -5,6 +5,7 @@ export const LAYOUT_OPTIONS = {
 }
 
 export const SETTINGS = {
+  layoutMode: 'auto',
   sandboxVisible: true,
   sandboxWidth: LAYOUT_OPTIONS.sandboxWidth.default,
   topicWidth: LAYOUT_OPTIONS.topicWidth.default,
@@ -23,6 +24,9 @@ export function normalizeSettings(saved) {
     const value = Number.isFinite(settings[key]) ? settings[key] : option.default
     settings[key] = Math.max(option.min, Math.min(option.max, Math.round(value / option.step) * option.step))
   }
+  if (saved?.layoutMode === undefined) {
+    settings.layoutMode = Object.keys(LAYOUT_OPTIONS).some(key => Number.isFinite(saved?.[key]) && settings[key] !== SETTINGS[key]) ? 'manual' : 'auto'
+  } else if (!['auto', 'manual'].includes(settings.layoutMode)) settings.layoutMode = 'auto'
   return settings
 }
 

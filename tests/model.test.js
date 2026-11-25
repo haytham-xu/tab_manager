@@ -5,6 +5,13 @@ import { chromeBrowser } from '../src/core/chrome-browser'
 import { LAYOUT_OPTIONS, SETTINGS, duplicateColors, exactMatches, initialState, makeBackup, normalizeGroup, normalizeSettings, validateBackup } from '../src/core/model'
 
 describe('local tab state', () => {
+  it('enables automatic layout for defaults while preserving older custom sizes as manual', () => {
+    expect(normalizeSettings({ sandboxWidth: SETTINGS.sandboxWidth, topicWidth: SETTINGS.topicWidth, topicVisibleTabs: SETTINGS.topicVisibleTabs }).layoutMode).toBe('auto')
+    expect(normalizeSettings({ sandboxWidth: 520, topicWidth: 340, topicVisibleTabs: 4 }).layoutMode).toBe('manual')
+    expect(normalizeSettings({ layoutMode: 'manual' }).layoutMode).toBe('manual')
+    expect(normalizeSettings({ layoutMode: 'unknown' }).layoutMode).toBe('auto')
+  })
+
   it('adds layout defaults to legacy settings without changing saved choices', () => {
     const saved = { sandboxVisible: false, reuseEnabled: false, collapsedGroups: ['topic'] }
     const settings = normalizeSettings(saved)

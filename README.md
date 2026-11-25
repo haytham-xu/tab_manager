@@ -91,13 +91,32 @@ grayscale favicons. Restored tabs have explicit per-tab reuse exemptions, and ea
 new-tab reuse decision is consumed only once. A restore creates its window in the
 background and focuses the selected target once after creation is complete.
 
-Settings include Sandbox width, minimum topic card width and visible tabs per topic.
+Settings include automatic and manual layouts, Sandbox width, minimum topic card width
+and visible tabs per topic. Automatic mode follows the current manager window's viewport
+and available space, updating when you resize the window, change browser zoom or move
+between displays. Each manager window adapts independently; saved manual sizes are preserved.
 Cards expand to fill their row; longer topics scroll within the configured tab limit.
 Sandbox tabs and the bulk toolbar stay on a single line; its minimum width is 470px.
 Narrow windows scroll the workspace horizontally rather than wrapping its controls.
 The default 480px Sandbox and 320px minimum topic width display two topic columns
 with Sandbox open and three with it closed at a 1280px viewport. Set minimum topic
 width to 280px for four columns with Sandbox closed. Layout preferences stay local.
+
+Automatic mode chooses the closest reference width and fits visible rows to the window
+height. Sizes are browser CSS pixels, so Retina scaling and the monitor's advertised
+physical resolution do not need separate device rules. Intermediate widths such as
+2440 use the nearby 2560 preset. Existing custom sizes remain in Manual mode until you
+choose Automatic; manual mode can also start from any preset.
+
+| Reference viewport width | Sandbox width | Minimum topic width | Columns with Sandbox | Columns without Sandbox |
+| --- | --- | --- | --- | --- |
+| 1280 | 480 | 320 | 2 | 3 |
+| 1440 | 500 | 330 | 2 | 4 |
+| 1920 | 560 | 360 | 3 | 5 |
+| 2560 | 640 | 380 | 4 | 6 |
+| 3440 | 760 | 400 | 6 | 8 |
+
+Column counts assume enough topics; fewer topics expand to fill the row.
 
 ```sh
 npm install
