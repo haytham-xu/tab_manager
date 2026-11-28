@@ -108,7 +108,7 @@ export function freshTab(tab, previous) {
   return {
     id: previous?.id || crypto.randomUUID(), chromeId: tab.id, url: tab.url || tab.pendingUrl || '',
     title: tab.title || '', name: previous?.name || '', favicon: tab.favIconUrl || '',
-    pinned: !!tab.pinned, active: !!tab.active, assigned: previous?.assigned || false,
+    pinned: !!tab.pinned, active: !!tab.active, focused: !!tab.focused, assigned: previous?.assigned || false,
     index: tab.index, lastAccessed: tab.lastAccessed || previous?.lastAccessed || 0,
   }
 }

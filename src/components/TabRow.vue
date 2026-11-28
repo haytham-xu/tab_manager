@@ -8,7 +8,7 @@ const emit = defineEmits(['activate', 'close', 'info', 'select', 'target', 'assi
 const imageFailed = ref(false)
 </script>
 <template>
-  <div class="tab-row" :data-tab-id="tab.id" :class="[{ 'sandbox-row': sandbox, 'is-active': tab.active && !archived, 'is-archived': archived }, color !== undefined ? `duplicate-${color}` : '']" draggable="true" @dragstart="emit('dragstart', $event)" @dragover.prevent @drop.stop.prevent="emit('drop', $event)">
+  <div class="tab-row" :data-tab-id="tab.id" :class="[{ 'sandbox-row': sandbox, 'is-active': tab.active && !archived, 'is-focused': tab.focused && !archived, 'is-archived': archived }, color !== undefined ? `duplicate-${color}` : '']" draggable="true" @dragstart="emit('dragstart', $event)" @dragover.prevent @drop.stop.prevent="emit('drop', $event)">
     <input v-if="sandbox" type="checkbox" :checked="selected" :aria-label="`Select ${tabName(tab)}`" @click.stop @change="emit('select', $event.target.checked)" />
     <span v-else class="tab-index" :class="{ active: tab.active && !archived }">{{ index }}</span>
     <img v-if="tab.favicon && !imageFailed" :src="tab.favicon" class="tab-favicon" alt="" loading="lazy" @error="imageFailed = true" />

@@ -93,6 +93,18 @@ describe('browser-independent engine', () => {
     expect(engine.locate(tab.id).tab.assigned).toBe(true)
   })
 
+  it('tracks the active tab in the focused window separately from other active tabs', async () => {
+    app.tabs = [
+      { id: 1, windowId: 7, index: 0, url, title: 'First', active: true, focused: false },
+      { id: 2, windowId: 8, index: 0, url: 'https://other.invalid/', title: 'Second', active: true, focused: true },
+    ]
+    await engine.request('snapshot')
+    expect(engine.state.groups.flatMap(group => group.tabs).map(tab => [tab.active, tab.focused])).toEqual([[true, false], [true, true]])
+    app.tabs = app.tabs.map(tab => ({ ...tab, focused: tab.windowId === 7 }))
+    await engine.request('snapshot')
+    expect(engine.state.groups.flatMap(group => group.tabs).map(tab => tab.focused)).toEqual([true, false])
+  })
+
   it('archives manually closed windows from cached tabs exactly once', async () => {
     const group = engine.state.groups[0]
     app.tabs = []

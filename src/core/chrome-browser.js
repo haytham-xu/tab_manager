@@ -8,7 +8,9 @@ export function chromeBrowser(api = chrome) {
     },
     async listTabs() {
       const internal = api.runtime.getURL('')
+      const focusedWindows = new Set((await api.windows.getAll()).filter(window => window.focused).map(window => window.id))
       return (await api.tabs.query({})).filter(tab => !tab.incognito && tab.windowId > 0 && !(tab.url || tab.pendingUrl || '').startsWith(internal))
+        .map(tab => ({ ...tab, focused: !!tab.active && focusedWindows.has(tab.windowId) }))
     },
     getTab: id => api.tabs.get(id),
     async activate(id) {

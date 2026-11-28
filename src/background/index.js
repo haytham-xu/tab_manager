@@ -55,7 +55,10 @@ chrome.tabs.onRemoved.addListener((id, info) => {
   engine.event('removed', { id, windowClosing: info.isWindowClosing }).catch(() => {})
 })
 chrome.tabs.onActivated.addListener(() => { engine.event('sync', {}).then(() => badge.schedule()).catch(() => {}) })
-chrome.windows.onFocusChanged.addListener(id => { if (id !== chrome.windows.WINDOW_ID_NONE) badge.schedule() })
+chrome.windows.onFocusChanged.addListener(id => {
+  engine.event('sync', {}).catch(() => {})
+  if (id !== chrome.windows.WINDOW_ID_NONE) badge.schedule()
+})
 chrome.windows.onRemoved.addListener(() => { engine.event('sync', {}).catch(() => {}) })
 chrome.tabs.onAttached.addListener(() => { engine.event('sync', {}).catch(() => {}) })
 chrome.runtime.onStartup.addListener(() => {

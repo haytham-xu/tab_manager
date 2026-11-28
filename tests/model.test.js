@@ -86,14 +86,15 @@ describe('local tab state', () => {
   it('excludes management and chooser pages and incognito tabs', async () => {
     const browser = chromeBrowser({
       runtime: { getURL: () => 'chrome-extension://test/' },
+      windows: { getAll: async () => [{ id: 7, focused: true }] },
       tabs: { query: async () => [
-        { id: 1, windowId: 7, url: 'about:blank' },
+        { id: 1, windowId: 7, url: 'about:blank', active: true },
         { id: 2, windowId: 7, url: 'chrome-extension://test/index.html' },
         { id: 3, windowId: 7, url: 'chrome-extension://test/chooser.html' },
         { id: 4, windowId: 8, url: 'about:blank', incognito: true },
       ] },
     })
-    expect((await browser.listTabs()).map(tab => tab.id)).toEqual([1])
+    expect((await browser.listTabs()).map(tab => [tab.id, tab.focused])).toEqual([[1, true]])
   })
 
   it('restores a topic in the background and focuses only the selected tab once', async () => {

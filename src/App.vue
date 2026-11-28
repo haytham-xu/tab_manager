@@ -33,6 +33,7 @@ const batchSelected = ref([])
 const batchQuery = ref('')
 const batchTarget = ref('')
 const duplicateOnly = ref(false)
+const selectedGroups = ref([])
 const drag = ref(null)
 const backupInput = ref(null)
 let unsubscribe = () => {}
@@ -47,6 +48,8 @@ const sandbox = computed(() => state.value.groups.filter(group => group.status =
 const colors = computed(() => duplicateColors(state.value.groups))
 const currentGroups = computed(() => state.value.groups.filter(group => group.hibernate === (view.value === 'hibernate')))
 const visibleGroups = computed(() => currentGroups.value.filter(group => !query.value || `${groupName(group)} ${group.tabs.map(tab => `${tabName(tab)} ${tab.url}`).join(' ')}`.toLowerCase().includes(query.value.toLowerCase())))
+const unnamedGroups = computed(() => state.value.groups.filter(group => !group.name?.trim()))
+const manageableGroups = computed(() => state.value.groups.filter(group => !query.value || `${groupName(group)} ${group.tabs.map(tab => `${tabName(tab)} ${tab.url}`).join(' ')}`.toLowerCase().includes(query.value.toLowerCase())))
 const layoutArea = computed(() => ({ ...workspaceSpace, groupCount: visibleGroups.value.length }))
 const currentLayout = computed(() => resolveLayout(layoutSettings.value, layoutArea.value))
 const automaticLayout = computed(() => resolveLayout({ ...layoutSettings.value, layoutMode: 'auto' }, layoutArea.value))
@@ -77,6 +80,7 @@ function accept(snapshot) {
   }
   if (batchId.value && !batchGroup.value) batchId.value = null
   batchSelected.value = batchSelected.value.filter(id => batchGroup.value?.tabs.some(tab => tab.id === id))
+  selectedGroups.value = selectedGroups.value.filter(id => state.value.groups.some(group => group.id === id))
 }
 
 async function refresh() {
@@ -161,6 +165,24 @@ async function revealActive() {
 }
 
 function openBatch(group) { batchId.value = group.id; batchSelected.value = []; batchQuery.value = ''; batchTarget.value = ''; duplicateOnly.value = false }
+function toggleGroupSelection(id, value) {
+  selectedGroups.value = value ? [...new Set([...selectedGroups.value, id])] : selectedGroups.value.filter(item => item !== id)
+}
+function selectUnnamedGroups() {
+  selectedGroups.value = unnamedGroups.value.map(group => group.id)
+}
+function openGroups() {
+  view.value = 'groups'
+}
+function deleteSelectedGroups() {
+  const groups = selectedGroups.value.map(id => state.value.groups.find(group => group.id === id)).filter(Boolean)
+  ask('Delete selected groups?', `Permanently delete ${groups.length} groups${groups.some(group => group.status === 'live') ? ', closing any live windows they contain' : ''}?`, async () => {
+    for (const group of groups) if (!await run('delete', { groupId: group.id })) return false
+    selectedGroups.value = []
+    toast(`${groups.length} groups deleted`)
+    return true
+  })
+}
 async function batchMove() {
   if (await run('transfer', { tabIds: batchSelected.value, groupId: batchTarget.value }, 'Tabs assigned')) batchSelected.value = []
 }
@@ -311,16 +333,19 @@ onUnmounted(() => {
         <button class="header-toggle" role="switch" :aria-checked="state.settings.reuseEnabled" @click="run('settings', { reuseEnabled: !state.settings.reuseEnabled })"><span>Unique Tabs</span><span class="switch-track" :class="{ enabled: state.settings.reuseEnabled }"><span class="switch-thumb"></span></span></button>
         <button class="header-toggle" role="switch" :aria-checked="state.settings.followActive" @click="run('settings', { followActive: !state.settings.followActive })"><span>Focus Tab</span><span class="switch-track" :class="{ enabled: state.settings.followActive }"><span class="switch-thumb"></span></span></button>
         <IconButton label="Sync tabs" :icon="loading || busy ? LoaderCircle : RefreshCw" :class="{ spinning: loading || busy }" :disabled="busy" @click="refresh" />
-        <IconButton label="Settings" :icon="Settings" @click="openSettings" />
+        <details class="action-menu header-menu"><summary aria-label="More options"><MoreHorizontal :size="19" /></summary><div class="menu-panel"><button :class="{ 'menu-current': view === 'groups' }" @click="openGroups">Groups</button><button @click="openSettings">Settings</button><button @click="archiveAll">Archive all windows</button></div></details>
       </div>
       <span class="toolbar-total toolbar-meta-hidden">{{ allTabs }} tabs · {{ state.groups.length }} topics</span>
       <span class="local-label toolbar-meta-hidden"><CloudOff :size="14" />Local only</span>
-      <details class="action-menu toolbar-meta-hidden"><summary aria-label="Window actions"><MoreHorizontal :size="18" /></summary><div class="menu-panel"><button @click="archiveAll">Archive all windows</button><button @click="openSettings">Settings and backup</button></div></details>
       <input ref="backupInput" type="file" accept="application/json,.json" hidden @change="importBackup" />
     </header>
 
     <div v-if="error" class="error-banner" role="alert"><span>{{ error }}</span><button aria-label="Dismiss error" @click="error = ''"><X :size="16" /></button></div>
-    <div ref="workspace" class="workspace" :style="layoutStyle" :data-layout-mode="currentLayout.mode" :data-layout-preset="currentLayout.preset?.id || 'manual'" :data-window-width="workspaceSpace.viewportWidth" :data-window-height="workspaceSpace.viewportHeight" :class="{ 'sandbox-hidden': !state.settings.sandboxVisible, 'is-stacked': currentLayout.stacked }">
+    <section v-if="view === 'groups'" class="group-manager" aria-label="Manage groups">
+      <header class="group-manager-header"><div class="group-manager-title"><h2>Manage groups</h2><span>{{ manageableGroups.length }} groups · {{ unnamedGroups.length }} unnamed</span></div><div class="group-manager-actions"><button class="secondary" :disabled="!unnamedGroups.length" @click="selectUnnamedGroups">Select unnamed</button><label><input type="checkbox" :checked="manageableGroups.length > 0 && manageableGroups.every(group => selectedGroups.includes(group.id))" @change="selectedGroups = $event.target.checked ? [...new Set([...selectedGroups, ...manageableGroups.map(group => group.id)])] : selectedGroups.filter(id => !manageableGroups.some(group => group.id === id))" />Select all</label><span>{{ selectedGroups.length }} selected</span><button class="danger-button" :disabled="!selectedGroups.length || busy" @click="deleteSelectedGroups"><Trash2 :size="14" />Delete selected</button></div></header>
+      <div class="group-manager-list"><div v-for="group in manageableGroups" :key="group.id" class="group-manager-row"><input type="checkbox" :checked="selectedGroups.includes(group.id)" :aria-label="`Select ${group.name?.trim() || 'Uncategorized'}`" @change="toggleGroupSelection(group.id, $event.target.checked)" /><span class="group-manager-name" :title="groupName(group)">{{ group.name?.trim() || 'Uncategorized' }}</span><span class="group-manager-status" :class="group.status">{{ group.status === 'live' ? 'Live window' : 'Archived' }}</span><span class="group-manager-meta">{{ group.tabs.length }} tabs · {{ group.hibernate ? 'Hibernate' : 'Regular' }}</span></div><div v-if="!manageableGroups.length" class="empty-inline"><FolderOpen :size="24" /><span>{{ query ? 'No matching groups' : 'No groups' }}</span></div></div>
+    </section>
+    <div v-else ref="workspace" class="workspace" :style="layoutStyle" :data-layout-mode="currentLayout.mode" :data-layout-preset="currentLayout.preset?.id || 'manual'" :data-window-width="workspaceSpace.viewportWidth" :data-window-height="workspaceSpace.viewportHeight" :class="{ 'sandbox-hidden': !state.settings.sandboxVisible, 'is-stacked': currentLayout.stacked }">
       <aside v-if="state.settings.sandboxVisible" class="sandbox-panel" aria-label="Sandbox">
         <header class="sandbox-header"><h2>Sandbox <span class="count">{{ sandbox.length }}</span></h2><label><input type="checkbox" :checked="sandbox.length > 0 && selected.length === sandbox.length" :indeterminate="selected.length > 0 && selected.length < sandbox.length" @change="selected = $event.target.checked ? sandbox.map(tab => tab.id) : []" />Select all</label><IconButton label="Hide Sandbox" :icon="LayoutPanelLeft" @click="run('settings', { sandboxVisible: false })" /></header>
         <div class="sandbox-toolbar"><select v-model="bulkTarget" aria-label="Bulk target topic"><option value="">Move selected to…</option><option v-for="group in state.groups" :key="group.id" :value="group.id">{{ groupName(group) }}{{ group.status === 'archived' ? ' · Archived' : '' }}</option></select><button class="primary" :disabled="!selected.length || !bulkTarget || busy" @click="run('transfer', { tabIds: selected, groupId: bulkTarget }, 'Tabs assigned')">Move</button><button class="secondary" :disabled="!selected.length || busy" @click="run('assign', { tabIds: selected }, 'Tabs assigned')">Assign current group</button></div>

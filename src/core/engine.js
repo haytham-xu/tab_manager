@@ -50,7 +50,7 @@ export class TabEngine {
   }
 
   archiveRecord(group) {
-    return { ...group, status: 'archived', windowId: null, archivedAt: Date.now(), tabs: group.tabs.map(tab => ({ ...tab, chromeId: null, active: false, assigned: true })) }
+    return { ...group, status: 'archived', windowId: null, archivedAt: Date.now(), tabs: group.tabs.map(tab => ({ ...tab, chromeId: null, active: false, focused: false, assigned: true })) }
   }
 
   async sync(recovery = false) {
@@ -96,7 +96,7 @@ export class TabEngine {
       if (recovery && old) {
         current.retainedTabs = [
           ...(old.retainedTabs || []),
-          ...[...aliases.values()].flat().map(tab => ({ ...tab, chromeId: null, active: false })),
+          ...[...aliases.values()].flat().map(tab => ({ ...tab, chromeId: null, active: false, focused: false })),
         ]
       }
       groups.push(current)
@@ -215,7 +215,7 @@ export class TabEngine {
       const { group, tab } = this.locate(id)
       if (group.id === target.id) { tab.assigned = true; continue }
       if (target.status === 'archived') {
-        if (!target.tabs.some(item => item.sourceId === tab.id)) target.tabs.push({ ...tab, id: crypto.randomUUID(), sourceId: tab.id, chromeId: null, active: false, assigned: true })
+        if (!target.tabs.some(item => item.sourceId === tab.id)) target.tabs.push({ ...tab, id: crypto.randomUUID(), sourceId: tab.id, chromeId: null, active: false, focused: false, assigned: true })
         await this.save()
         if (group.status === 'live') {
           await this.browser.closeTab(tab.chromeId)
